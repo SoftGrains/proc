@@ -1,12 +1,12 @@
 package proc
 
 type processContext struct {
-	self    ProcessId
+	self    ProcessID
 	message interface{}
 }
 
 // NewContext xxxx
-func newContext(self ProcessId, message interface{}) Context {
+func newContext(self ProcessID, message interface{}) Context {
 
 	return &processContext{
 		self:    self,
@@ -15,12 +15,12 @@ func newContext(self ProcessId, message interface{}) Context {
 }
 
 // Self xxx
-func (context *processContext) Self() ProcessId {
+func (context *processContext) Self() ProcessID {
 	return context.self
 }
 
 // Message xxx
-func (context *processContext) Message() (interface{}, ProcessId) {
+func (context *processContext) Message() (interface{}, ProcessID) {
 
 	switch msg := context.message.(type) {
 
@@ -32,6 +32,6 @@ func (context *processContext) Message() (interface{}, ProcessId) {
 }
 
 type messageWithSender struct {
-	sender  ProcessId
+	sender  ProcessID
 	message interface{}
 }

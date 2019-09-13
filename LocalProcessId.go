@@ -1,29 +1,27 @@
 package proc
 
-// ProcessId xxx
-type localProcessId struct {
+type localProcessID struct {
 	process *process
 }
 
-func (pid *localProcessId) Send(message interface{}) {
+func (pid *localProcessID) Send(message interface{}) {
 
 	pid.process.Send(
 		message,
 		false)
 }
 
-func (pid *localProcessId) SendFrom(sender ProcessId, message interface{}) {
+func (pid *localProcessID) SendFrom(sender ProcessID, message interface{}) {
 
 	pid.Send(
 		messageWithSender{
 			sender:  sender,
 			message: message,
-		})	
+		})
 }
 
-
-func (pid *localProcessId) Stop() {
+func (pid *localProcessID) Stop() {
 
 	pid.process.Send(
-		stopMessage{}, true)
+		stopProcessMessage{}, true)
 }

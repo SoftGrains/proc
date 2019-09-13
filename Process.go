@@ -1,8 +1,6 @@
 package proc
 
-import (
-	"sync/atomic"
-)
+import "sync/atomic"
 
 const (
 	idle int32 = iota
@@ -11,37 +9,41 @@ const (
 )
 
 type startProcessMessage struct{}
-type stopMessage struct{}
+type stopProcessMessage struct{}
 
+// ProcessStartedMessage xxx
 type ProcessStartedMessage struct{}
+
+// ProcessStoppedMessage xxx
 type ProcessStoppedMessage struct{}
 
 // Process xxx
 type process struct {
-	pid             ProcessId
+	pid             ProcessID
+	receive         func(Context)
+	actor           Actor
+	args            []interface{}
 	internalMailbox *Mailbox
 	mailbox         *Mailbox
-	actor           Actor
-	receive         func(Context)
-	args            []interface{}
+	messagesCount   int32
 	processStatus   int32
 }
 
 // NewProcess xxxx
 func newProcess(actor Actor, args []interface{}) *process {
 	return &process{
-		internalMailbox: NewMailbox(),
-		mailbox:         NewMailbox(),
 		actor:           actor,
 		args:            args,
+		internalMailbox: NewMailbox(),
+		mailbox:         NewMailbox(),
 		processStatus:   idle,
 	}
 }
 
-func (proc *process) ID() ProcessId {
+func (proc *process) ID() ProcessID {
 
 	if proc.pid == nil {
-		proc.pid = &localProcessId{
+		proc.pid = &localProcessID{
 			process: proc,
 		}
 	}
@@ -61,6 +63,8 @@ func (proc *process) Send(message interface{}, internal bool) {
 	}
 
 	// add message to mailbox
+	atomic.AddInt32(&proc.messagesCount, 1)
+
 	if internal {
 		proc.internalMailbox.Enqueue(message)
 
@@ -76,16 +80,28 @@ func (proc *process) Send(message interface{}, internal bool) {
 }
 
 // processMessages xxxx
-func (proc *process) processMessages() {
+func (proc *process) pullMessage() (interface{}, bool) {
 
-	// push the messages into the actor
+	var msg, ok = proc.internalMailbox.Dequeue()
+
+	if ok == false {
+		msg, ok = proc.mailbox.Dequeue()
+	}
+
+	if ok {
+		atomic.AddInt32(&proc.messagesCount, -1)
+	}
+
+	return msg, ok
+}
+
+// processMessages xxxx
+func (proc *process) processMessages() {
+processMessagesLabel:
+
 	for {
 
-		var msg, ok = proc.internalMailbox.Dequeue()
-		if ok == false {
-			msg, ok = proc.mailbox.Dequeue()
-		}
-
+		var msg, ok = proc.pullMessage()
 		if ok == false {
 			break
 		}
@@ -101,27 +117,31 @@ func (proc *process) processMessages() {
 				return
 			}
 
-			proc.internalMailbox.Enqueue(ProcessStartedMessage{})
+			msg = ProcessStartedMessage{}
 
-			continue
-
-		case stopMessage:
+		case stopProcessMessage:
 			atomic.StoreInt32(&proc.processStatus, terminated)
 
-			proc.internalMailbox = NewMailbox()
-			proc.mailbox = NewMailbox()
+			proc.receive(newContext(
+				proc.pid,
+				ProcessStoppedMessage{}))
 
-			proc.internalMailbox.Enqueue(ProcessStoppedMessage{})
-
-			continue
+			return
 		}
 
-		var context = newContext(
+		proc.receive(newContext(
 			proc.pid,
-			msg)
-
-		proc.receive(context)
+			msg))
 	}
 
-	atomic.StoreInt32(&proc.processStatus, idle)
+	if ok := atomic.CompareAndSwapInt32(&proc.processStatus, running, idle); ok == false {
+		return
+	}
+
+	// check if there are still messages to process
+	if atomic.LoadInt32(&proc.messagesCount) > 0 &&
+		atomic.CompareAndSwapInt32(&proc.processStatus, idle, running) {
+
+		goto processMessagesLabel
+	}
 }

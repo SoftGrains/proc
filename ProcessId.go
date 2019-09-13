@@ -1,8 +1,8 @@
 package proc
 
-// ProcessId xxx
-type ProcessId interface {
+// ProcessID xxx
+type ProcessID interface {
 	Send(message interface{})
-	SendFrom(sender ProcessId, message interface{})
+	SendFrom(sender ProcessID, message interface{})
 	Stop()
 }
