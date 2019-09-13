@@ -1,5 +1,10 @@
 package proc
 
+type messageWithSender struct {
+	sender  ProcessID
+	message interface{}
+}
+
 type localProcessID struct {
 	process *process
 }

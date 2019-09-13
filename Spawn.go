@@ -1,10 +1,10 @@
 package proc
 
-// Actor xxxxxxxxxx
-type Actor = func(...interface{}) func(Context)
+// ProcessHandler xxxxxxxxxx
+type ProcessHandler = func(...interface{}) func(Context)
 
 // Spawn xxxx
-func Spawn(fn Actor, args ...interface{}) ProcessID {
+func Spawn(fn ProcessHandler, args ...interface{}) ProcessID {
 
 	var proc = newProcess(fn, args)
 	proc.start()

@@ -20,8 +20,8 @@ type ProcessStoppedMessage struct{}
 // Process xxx
 type process struct {
 	pid             ProcessID
-	receive         func(Context)
-	actor           Actor
+	receiveHandler  func(Context)
+	handler         ProcessHandler
 	args            []interface{}
 	internalMailbox *Mailbox
 	mailbox         *Mailbox
@@ -30,9 +30,9 @@ type process struct {
 }
 
 // NewProcess xxxx
-func newProcess(actor Actor, args []interface{}) *process {
+func newProcess(handler ProcessHandler, args []interface{}) *process {
 	return &process{
-		actor:           actor,
+		handler:         handler,
 		args:            args,
 		internalMailbox: NewMailbox(),
 		mailbox:         NewMailbox(),
@@ -109,9 +109,9 @@ processMessagesLabel:
 		switch msg.(type) {
 
 		case startProcessMessage:
-			proc.receive = proc.actor(proc.args...)
+			proc.receiveHandler = proc.handler(proc.args...)
 
-			if proc.receive == nil {
+			if proc.receiveHandler == nil {
 				atomic.StoreInt32(&proc.processStatus, terminated)
 
 				return
@@ -122,14 +122,14 @@ processMessagesLabel:
 		case stopProcessMessage:
 			atomic.StoreInt32(&proc.processStatus, terminated)
 
-			proc.receive(newContext(
+			proc.receiveHandler(newContext(
 				proc.pid,
 				ProcessStoppedMessage{}))
 
 			return
 		}
 
-		proc.receive(newContext(
+		proc.receiveHandler(newContext(
 			proc.pid,
 			msg))
 	}

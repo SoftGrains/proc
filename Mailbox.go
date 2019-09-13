@@ -33,12 +33,14 @@ func (q *Mailbox) Enqueue(v interface{}) {
 	for {
 		last := load(&q.tail)
 		next := load(&last.next)
+
 		if last == load(&q.tail) {
 			if next == nil {
 				if cas(&last.next, next, n) {
 					cas(&q.tail, last, n)
 					return
 				}
+				
 			} else {
 				cas(&q.tail, last, next)
 			}
@@ -53,6 +55,7 @@ func (q *Mailbox) Dequeue() (interface{}, bool) {
 		first := load(&q.head)
 		last := load(&q.tail)
 		next := load(&first.next)
+
 		if first == load(&q.head) {
 			if first == last {
 				if next == nil {

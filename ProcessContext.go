@@ -1,22 +1,21 @@
 package proc
 
 type processContext struct {
-	self    ProcessID
+	pid     ProcessID
 	message interface{}
 }
 
-// NewContext xxxx
-func newContext(self ProcessID, message interface{}) Context {
+func newContext(pid ProcessID, message interface{}) Context {
 
 	return &processContext{
-		self:    self,
+		pid:     pid,
 		message: message,
 	}
 }
 
 // Self xxx
 func (context *processContext) Self() ProcessID {
-	return context.self
+	return context.pid
 }
 
 // Message xxx
@@ -29,9 +28,4 @@ func (context *processContext) Message() (interface{}, ProcessID) {
 	}
 
 	return context.message, nil
-}
-
-type messageWithSender struct {
-	sender  ProcessID
-	message interface{}
 }
