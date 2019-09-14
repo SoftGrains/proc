@@ -11,9 +11,6 @@ const (
 type startProcessMessage struct{}
 type stopProcessMessage struct{}
 
-// ProcessStartedMessage xxx
-type ProcessStartedMessage struct{}
-
 // ProcessStoppedMessage xxx
 type ProcessStoppedMessage struct{}
 
@@ -109,7 +106,7 @@ processMessagesLabel:
 		switch msg.(type) {
 
 		case startProcessMessage:
-			proc.receiveHandler = proc.handler(proc.args...)
+			proc.receiveHandler = proc.handler(proc.pid, proc.args...)
 
 			if proc.receiveHandler == nil {
 				atomic.StoreInt32(&proc.processStatus, terminated)
@@ -117,21 +114,19 @@ processMessagesLabel:
 				return
 			}
 
-			msg = ProcessStartedMessage{}
+			continue
 
 		case stopProcessMessage:
 			atomic.StoreInt32(&proc.processStatus, terminated)
 
-			proc.receiveHandler(newContext(
-				proc.pid,
-				ProcessStoppedMessage{}))
+			proc.receiveHandler(
+				newContext(ProcessStoppedMessage{}))
 
 			return
 		}
 
-		proc.receiveHandler(newContext(
-			proc.pid,
-			msg))
+		proc.receiveHandler(
+			newContext(msg))
 	}
 
 	if ok := atomic.CompareAndSwapInt32(&proc.processStatus, running, idle); ok == false {

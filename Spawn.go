@@ -1,7 +1,7 @@
 package proc
 
 // ProcessHandler xxxxxxxxxx
-type ProcessHandler = func(...interface{}) func(Context)
+type ProcessHandler = func(ProcessID, ...interface{}) func(Context)
 
 // Spawn xxxx
 func Spawn(fn ProcessHandler, args ...interface{}) ProcessID {
