@@ -4,10 +4,8 @@ package proc
 type ProcessHandler = func(ProcessID, ...interface{}) func(ProcessID, interface{})
 
 // Spawn xxxx
-func Spawn(fn ProcessHandler, args ...interface{}) ProcessID {
+func Spawn(handler ProcessHandler, args ...interface{}) ProcessID {
 
-	var proc = newProcess(fn, args)
-	proc.start()
-
-	return proc.ID()
+	return newProcess(handler, args).
+		start()
 }

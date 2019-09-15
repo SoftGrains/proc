@@ -39,19 +39,16 @@ func newProcess(handler ProcessHandler, args []interface{}) *process {
 	}
 }
 
-func (proc *process) ID() ProcessID {
-
+func (proc *process) start() ProcessID {
 	if proc.pid == nil {
 		proc.pid = &localProcessID{
 			process: proc,
 		}
 	}
 
-	return proc.pid
-}
-
-func (proc *process) start() {
 	proc.Send(startProcessMessage{}, true)
+
+	return proc.pid
 }
 
 // Send xxxx
