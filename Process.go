@@ -19,7 +19,7 @@ type ProcessStoppedMessage struct{}
 // Process xxx
 type process struct {
 	pid             ProcessID
-	receiveHandler  func(Context)
+	receiveHandler  func(ProcessID, interface{})
 	handler         ProcessHandler
 	args            []interface{}
 	internalMailbox *Mailbox
@@ -105,6 +105,12 @@ processMessagesLabel:
 			break
 		}
 
+		var sender ProcessID
+		if m, ok := msg.(messageWithSender); ok {
+			sender = m.sender
+			msg = m.message
+		}
+
 		switch msg.(type) {
 
 		case startProcessMessage:
@@ -121,14 +127,12 @@ processMessagesLabel:
 		case StopProcessMessage:
 			atomic.StoreInt32(&proc.processStatus, terminated)
 
-			proc.receiveHandler(
-				newContext(ProcessStoppedMessage{}))
+			proc.receiveHandler(sender, ProcessStoppedMessage{})
 
 			return
 		}
 
-		proc.receiveHandler(
-			newContext(msg))
+		proc.receiveHandler(sender, msg)
 	}
 
 	if ok := atomic.CompareAndSwapInt32(&proc.processStatus, running, idle); ok == false {
