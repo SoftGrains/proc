@@ -9,7 +9,9 @@ const (
 )
 
 type startProcessMessage struct{}
-type stopProcessMessage struct{}
+
+// StopProcessMessage xxxx
+type StopProcessMessage struct{}
 
 // ProcessStoppedMessage xxx
 type ProcessStoppedMessage struct{}
@@ -116,7 +118,7 @@ processMessagesLabel:
 
 			continue
 
-		case stopProcessMessage:
+		case StopProcessMessage:
 			atomic.StoreInt32(&proc.processStatus, terminated)
 
 			proc.receiveHandler(

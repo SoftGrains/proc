@@ -11,22 +11,21 @@ type localProcessID struct {
 
 func (pid *localProcessID) Send(message interface{}) {
 
+	var _, internal = message.(StopProcessMessage)
+
 	pid.process.Send(
 		message,
-		false)
+		internal)
 }
 
 func (pid *localProcessID) SendFrom(sender ProcessID, message interface{}) {
 
-	pid.Send(
+	var _, internal = message.(StopProcessMessage)
+
+	pid.process.Send(
 		messageWithSender{
 			sender:  sender,
 			message: message,
-		})
-}
-
-func (pid *localProcessID) Stop() {
-
-	pid.process.Send(
-		stopProcessMessage{}, true)
+		},
+		internal)
 }

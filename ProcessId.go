@@ -4,5 +4,4 @@ package proc
 type ProcessID interface {
 	Send(message interface{})
 	SendFrom(sender ProcessID, message interface{})
-	Stop()
 }
