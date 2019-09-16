@@ -1,10 +1,12 @@
 package proc
 
+import "time"
+
 // Receive xxx
 type Receive = func(ProcessID, interface{})
 
 // ReceiveDispatcher xxxx
-type ReceiveDispatcher = func(Receive)
+type ReceiveDispatcher = func(Receive, ...time.Duration)
 
 // ProcessHandler xxxxxxxxxx
 type ProcessHandler = func(ProcessID, ReceiveDispatcher, ...interface{})

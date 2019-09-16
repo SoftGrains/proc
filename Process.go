@@ -1,6 +1,9 @@
 package proc
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+	"time"
+)
 
 const (
 	idle int32 = iota
@@ -20,10 +23,21 @@ type ProcessStoppedMessage struct {
 	Reason interface{}
 }
 
+// TimeoutAfter xxxxx
+type TimeoutAfter struct {
+	After time.Duration
+}
+
+type receiveHandler struct {
+	handler      Receive
+	timeoutAfter time.Duration
+	timerPid     ProcessID
+}
+
 // Process xxx
 type process struct {
 	pid             ProcessID
-	receiveHandlers []func(ProcessID, interface{})
+	receiveHandlers []*receiveHandler
 	handler         ProcessHandler
 	args            []interface{}
 	internalMailbox *Mailbox
@@ -85,6 +99,23 @@ processMessagesLabel:
 
 	for {
 
+		// check for next receive timeout
+		if len(proc.receiveHandlers) > 0 {
+			var nextHandler = proc.receiveHandlers[0]
+
+			// start timer process
+			if nextHandler.timeoutAfter >= 0 &&
+				nextHandler.timerPid == nil {
+				nextHandler.timerPid = Spawn(timerProcess)
+
+				nextHandler.timerPid.SendFrom(proc.pid, timeoutAfter{
+					After: nextHandler.timeoutAfter,
+				})
+
+			}
+		}
+
+		// fetch the next message
 		var msg, ok = proc.pullMessage()
 		if ok == false {
 			break
@@ -99,12 +130,22 @@ processMessagesLabel:
 		switch m := msg.(type) {
 
 		case startProcessMessage:
-			proc.handler(proc.pid, func(receive func(ProcessID, interface{})) {
+
+			proc.handler(proc.pid, func(receive Receive, after ...time.Duration) {
 				if receive == nil {
 					return
 				}
 
-				proc.receiveHandlers = append(proc.receiveHandlers, receive)
+				var handler = &receiveHandler{
+					handler:      receive,
+					timeoutAfter: -1,
+				}
+
+				if len(after) > 0 {
+					handler.timeoutAfter = after[0]
+				}
+
+				proc.receiveHandlers = append(proc.receiveHandlers, handler)
 
 			}, proc.args...)
 
@@ -124,9 +165,26 @@ processMessagesLabel:
 			})
 
 			return
+
+		case timeoutAfterReply:
+			// check that message fired for the right current receive handler
+			if len(proc.receiveHandlers) > 0 {
+				var handler = proc.receiveHandlers[0]
+				if handler.timerPid != sender {
+					continue
+				}
+
+				msg = TimeoutAfter{m.After}
+			}
 		}
 
 		proc.invokeReceive(sender, msg)
+
+		if len(proc.receiveHandlers) == 0 {
+			atomic.StoreInt32(&proc.processStatus, terminated)
+
+			return
+		}
 	}
 
 	if ok := atomic.CompareAndSwapInt32(&proc.processStatus, running, idle); ok == false {
@@ -164,7 +222,7 @@ func (proc *process) invokeReceive(sender ProcessID, message interface{}) {
 		return
 	}
 
-	var handler = proc.receiveHandlers[0]
+	var handler = proc.receiveHandlers[0].handler
 	proc.receiveHandlers = proc.receiveHandlers[1:]
 
 	handler(sender, message)
