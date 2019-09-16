@@ -11,10 +11,14 @@ const (
 type startProcessMessage struct{}
 
 // StopProcessMessage xxxx
-type StopProcessMessage struct{}
+type StopProcessMessage struct {
+	Reason interface{}
+}
 
 // ProcessStoppedMessage xxx
-type ProcessStoppedMessage struct{}
+type ProcessStoppedMessage struct {
+	Reason interface{}
+}
 
 // Process xxx
 type process struct {
@@ -108,7 +112,7 @@ processMessagesLabel:
 			msg = m.message
 		}
 
-		switch msg.(type) {
+		switch m := msg.(type) {
 
 		case startProcessMessage:
 			proc.receiveHandler = proc.handler(proc.pid, proc.args...)
@@ -124,7 +128,9 @@ processMessagesLabel:
 		case StopProcessMessage:
 			atomic.StoreInt32(&proc.processStatus, terminated)
 
-			proc.receiveHandler(sender, ProcessStoppedMessage{})
+			proc.receiveHandler(sender, ProcessStoppedMessage{
+				Reason: m.Reason,
+			})
 
 			return
 		}
