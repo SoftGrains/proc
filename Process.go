@@ -23,7 +23,7 @@ type ProcessStoppedMessage struct {
 // Process xxx
 type process struct {
 	pid             ProcessID
-	receiveHandler  func(ProcessID, interface{})
+	receiveHandlers []func(ProcessID, interface{})
 	handler         ProcessHandler
 	args            []interface{}
 	internalMailbox *Mailbox
@@ -80,22 +80,6 @@ func (proc *process) Send(message interface{}, internal bool) {
 }
 
 // processMessages xxxx
-func (proc *process) pullMessage() (interface{}, bool) {
-
-	var msg, ok = proc.internalMailbox.Dequeue()
-
-	if ok == false {
-		msg, ok = proc.mailbox.Dequeue()
-	}
-
-	if ok {
-		atomic.AddInt32(&proc.messagesCount, -1)
-	}
-
-	return msg, ok
-}
-
-// processMessages xxxx
 func (proc *process) processMessages() {
 processMessagesLabel:
 
@@ -115,9 +99,16 @@ processMessagesLabel:
 		switch m := msg.(type) {
 
 		case startProcessMessage:
-			proc.receiveHandler = proc.handler(proc.pid, proc.args...)
+			proc.handler(proc.pid, func(receive func(ProcessID, interface{})) {
+				if receive == nil {
+					return
+				}
 
-			if proc.receiveHandler == nil {
+				proc.receiveHandlers = append(proc.receiveHandlers, receive)
+
+			}, proc.args...)
+
+			if len(proc.receiveHandlers) == 0 {
 				atomic.StoreInt32(&proc.processStatus, terminated)
 
 				return
@@ -128,14 +119,14 @@ processMessagesLabel:
 		case StopProcessMessage:
 			atomic.StoreInt32(&proc.processStatus, terminated)
 
-			proc.receiveHandler(sender, ProcessStoppedMessage{
+			proc.invokeReceive(sender, ProcessStoppedMessage{
 				Reason: m.Reason,
 			})
 
 			return
 		}
 
-		proc.receiveHandler(sender, msg)
+		proc.invokeReceive(sender, msg)
 	}
 
 	if ok := atomic.CompareAndSwapInt32(&proc.processStatus, running, idle); ok == false {
@@ -148,4 +139,34 @@ processMessagesLabel:
 
 		goto processMessagesLabel
 	}
+}
+
+// processMessages xxxx
+func (proc *process) pullMessage() (interface{}, bool) {
+
+	var msg, ok = proc.internalMailbox.Dequeue()
+
+	if ok == false {
+		msg, ok = proc.mailbox.Dequeue()
+	}
+
+	if ok {
+		atomic.AddInt32(&proc.messagesCount, -1)
+	}
+
+	return msg, ok
+}
+
+// processMessages xxxx
+func (proc *process) invokeReceive(sender ProcessID, message interface{}) {
+
+	if len(proc.receiveHandlers) == 0 {
+		return
+	}
+
+	var handler = proc.receiveHandlers[0]
+	proc.receiveHandlers = proc.receiveHandlers[1:]
+
+	handler(sender, message)
+
 }
