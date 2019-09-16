@@ -168,5 +168,4 @@ func (proc *process) invokeReceive(sender ProcessID, message interface{}) {
 	proc.receiveHandlers = proc.receiveHandlers[1:]
 
 	handler(sender, message)
-
 }
