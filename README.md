@@ -10,5 +10,4 @@ golang actor process library
 	pid.Send(PrintState{})
 
 TODO:
- Watch process termination
  supervisor

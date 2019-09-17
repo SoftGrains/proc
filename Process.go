@@ -11,7 +11,7 @@ const (
 	terminated
 )
 
-type receiveHandler struct {
+type receiveQueueType struct {
 	handler      Receive
 	timeoutAfter time.Duration
 	timerPid     ProcessID
@@ -20,7 +20,7 @@ type receiveHandler struct {
 // Process xxx
 type process struct {
 	pid             ProcessID
-	receiveHandlers []*receiveHandler
+	receiveQueue    []*receiveQueueType
 	handler         ProcessHandler
 	args            []interface{}
 	internalMailbox *Mailbox
@@ -77,15 +77,14 @@ func (proc *process) Send(message interface{}) {
 	go proc.processMessages()
 }
 
-// processMessages xxxx
 func (proc *process) processMessages() {
 processMessagesLabel:
 
 	for {
 
 		// check for next receive timeout
-		if len(proc.receiveHandlers) > 0 {
-			var nextHandler = proc.receiveHandlers[0]
+		if len(proc.receiveQueue) > 0 {
+			var nextHandler = proc.receiveQueue[0]
 
 			// start timer process
 			if nextHandler.timeoutAfter >= 0 &&
@@ -117,7 +116,7 @@ processMessagesLabel:
 					return
 				}
 
-				var handler = &receiveHandler{
+				var handler = &receiveQueueType{
 					handler:      receive,
 					timeoutAfter: -1,
 				}
@@ -126,12 +125,12 @@ processMessagesLabel:
 					handler.timeoutAfter = after[0]
 				}
 
-				proc.receiveHandlers = append(proc.receiveHandlers, handler)
+				proc.receiveQueue = append(proc.receiveQueue, handler)
 
 			}, proc.args...)
 
-			if len(proc.receiveHandlers) == 0 {
-				atomic.StoreInt32(&proc.processStatus, terminated)
+			if len(proc.receiveQueue) == 0 {
+				proc.stopProcess(sender, "normal")
 
 				return
 			}
@@ -139,18 +138,14 @@ processMessagesLabel:
 			continue
 
 		case StopProcessMessage:
-			atomic.StoreInt32(&proc.processStatus, terminated)
-
-			proc.invokeReceive(sender, ProcessStoppedMessage{
-				Reason: m.Reason,
-			})
+			proc.stopProcess(sender, m.Reason)
 
 			return
 
 		case timeoutMessage:
 			// check that message fired for the right current receive handler
-			if len(proc.receiveHandlers) > 0 {
-				var handler = proc.receiveHandlers[0]
+			if len(proc.receiveQueue) > 0 {
+				var handler = proc.receiveQueue[0]
 				if handler.timerPid != sender {
 					continue
 				}
@@ -159,14 +154,30 @@ processMessagesLabel:
 			}
 
 		case FollowMessage:
+			if sender != nil && sender != proc.pid {
+				if proc.getFollowerIndex(sender) == -1 {
+					proc.followers = append(proc.followers, sender)
+				}
+			}
+
+			continue
 
 		case UnfollowMessage:
+			if sender != nil && sender != proc.pid {
+				if idx := proc.getFollowerIndex(sender); idx > -1 {
+					proc.followers = append(
+						proc.followers[:idx],
+						proc.followers[idx+1:]...)
+				}
+			}
+
+			continue
 		}
 
 		proc.invokeReceive(sender, msg)
 
-		if len(proc.receiveHandlers) == 0 {
-			atomic.StoreInt32(&proc.processStatus, terminated)
+		if len(proc.receiveQueue) == 0 {
+			proc.stopProcess(sender, "normal")
 
 			return
 		}
@@ -184,7 +195,6 @@ processMessagesLabel:
 	}
 }
 
-// processMessages xxxx
 func (proc *process) pullMessage() (interface{}, bool) {
 
 	var msg, ok = proc.internalMailbox.Dequeue()
@@ -200,15 +210,40 @@ func (proc *process) pullMessage() (interface{}, bool) {
 	return msg, ok
 }
 
-// processMessages xxxx
 func (proc *process) invokeReceive(sender ProcessID, message interface{}) {
 
-	if len(proc.receiveHandlers) == 0 {
+	if len(proc.receiveQueue) == 0 {
 		return
 	}
 
-	var handler = proc.receiveHandlers[0].handler
-	proc.receiveHandlers = proc.receiveHandlers[1:]
+	var handler = proc.receiveQueue[0].handler
+	proc.receiveQueue = proc.receiveQueue[1:]
 
 	handler(sender, message)
+}
+
+func (proc *process) stopProcess(sender ProcessID, reason interface{}) {
+	atomic.StoreInt32(&proc.processStatus, terminated)
+
+	proc.invokeReceive(sender, ProcessStoppedMessage{
+		Reason: reason,
+	})
+
+	// notify the follower processes
+	for _, fpid := range proc.followers {
+		fpid.SendFrom(proc.pid, FollowerStoppedMessage{
+			Reason: reason,
+		})
+	}
+}
+
+func (proc *process) getFollowerIndex(follower ProcessID) int {
+
+	for idx, pid := range proc.followers {
+		if pid == follower {
+			return idx
+		}
+	}
+
+	return -1
 }

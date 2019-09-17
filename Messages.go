@@ -34,6 +34,11 @@ type FollowMessage struct{}
 // UnfollowMessage xxxx
 type UnfollowMessage struct{}
 
+// FollowerStoppedMessage xxx
+type FollowerStoppedMessage struct{
+	Reason interface{}
+}
+
 func isInternalMessage(message interface{}) bool {
 
 	switch msg := message.(type) {
@@ -45,7 +50,8 @@ func isInternalMessage(message interface{}) bool {
 		StopProcessMessage,
 		timeoutMessage,
 		FollowMessage,
-		UnfollowMessage:
+		UnfollowMessage,
+		FollowerStoppedMessage:
 
 		return true
 	}
