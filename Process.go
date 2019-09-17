@@ -11,23 +11,6 @@ const (
 	terminated
 )
 
-type startProcessMessage struct{}
-
-// StopProcessMessage xxxx
-type StopProcessMessage struct {
-	Reason interface{}
-}
-
-// ProcessStoppedMessage xxx
-type ProcessStoppedMessage struct {
-	Reason interface{}
-}
-
-// TimeoutAfter xxxxx
-type TimeoutAfter struct {
-	After time.Duration
-}
-
 type receiveHandler struct {
 	handler      Receive
 	timeoutAfter time.Duration
@@ -44,6 +27,7 @@ type process struct {
 	mailbox         *Mailbox
 	messagesCount   int32
 	processStatus   int32
+	followers       []ProcessID
 }
 
 // NewProcess xxxx
@@ -64,13 +48,13 @@ func (proc *process) start() ProcessID {
 		}
 	}
 
-	proc.Send(startProcessMessage{}, true)
+	proc.Send(startProcessMessage{})
 
 	return proc.pid
 }
 
 // Send xxxx
-func (proc *process) Send(message interface{}, internal bool) {
+func (proc *process) Send(message interface{}) {
 
 	if atomic.LoadInt32(&proc.processStatus) == terminated {
 		return
@@ -79,7 +63,7 @@ func (proc *process) Send(message interface{}, internal bool) {
 	// add message to mailbox
 	atomic.AddInt32(&proc.messagesCount, 1)
 
-	if internal {
+	if isInternalMessage(message) {
 		proc.internalMailbox.Enqueue(message)
 
 	} else {
@@ -106,12 +90,9 @@ processMessagesLabel:
 			// start timer process
 			if nextHandler.timeoutAfter >= 0 &&
 				nextHandler.timerPid == nil {
-				nextHandler.timerPid = Spawn(timerProcess)
-
-				nextHandler.timerPid.SendFrom(proc.pid, timeoutAfter{
-					After: nextHandler.timeoutAfter,
-				})
-
+				nextHandler.timerPid = Spawn(timerProcess,
+					proc.pid,
+					nextHandler.timeoutAfter)
 			}
 		}
 
@@ -166,7 +147,7 @@ processMessagesLabel:
 
 			return
 
-		case timeoutAfterReply:
+		case timeoutMessage:
 			// check that message fired for the right current receive handler
 			if len(proc.receiveHandlers) > 0 {
 				var handler = proc.receiveHandlers[0]
@@ -174,8 +155,12 @@ processMessagesLabel:
 					continue
 				}
 
-				msg = TimeoutAfter{m.After}
+				msg = TimeoutMessage{m.After}
 			}
+
+		case FollowMessage:
+
+		case UnfollowMessage:
 		}
 
 		proc.invokeReceive(sender, msg)

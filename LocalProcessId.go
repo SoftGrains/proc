@@ -1,31 +1,18 @@
 package proc
 
-type messageWithSender struct {
-	sender  ProcessID
-	message interface{}
-}
-
 type localProcessID struct {
 	process *process
 }
 
 func (pid *localProcessID) Send(message interface{}) {
 
-	var _, internal = message.(StopProcessMessage)
-
-	pid.process.Send(
-		message,
-		internal)
+	pid.process.Send(message)
 }
 
 func (pid *localProcessID) SendFrom(sender ProcessID, message interface{}) {
 
-	var _, internal = message.(StopProcessMessage)
-
-	pid.process.Send(
-		messageWithSender{
-			sender:  sender,
-			message: message,
-		},
-		internal)
+	pid.process.Send(messageWithSender{
+		sender:  sender,
+		message: message,
+	})
 }

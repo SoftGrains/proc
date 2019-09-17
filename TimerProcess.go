@@ -2,27 +2,28 @@ package proc
 
 import "time"
 
-type timeoutAfter struct {
-	After time.Duration
-}
-
-type timeoutAfterReply struct {
-	After time.Duration
-}
-
 func timerProcess(self ProcessID, receive ReceiveDispatcher, args ...interface{}) {
 
-	receive(func(sender ProcessID, message interface{}) {
+	if len(args) < 2 {
+		return
+	}
 
-		if sender == nil {
-			return
-		}
+	sender, ok := args[0].(ProcessID)
+	if ok == false ||
+		sender == nil {
+		return
+	}
 
-		switch msg := message.(type) {
+	timeoutAfter, ok := args[1].(time.Duration)
+	if ok == false ||
+		timeoutAfter < 0 {
+		return
+	}
 
-		case timeoutAfter:
-			time.Sleep(msg.After)
-			sender.SendFrom(self, timeoutAfterReply{msg.After})
-		}
+	// sleep for a timeout
+	time.Sleep(timeoutAfter)
+
+	sender.SendFrom(self, timeoutMessage{
+		After: timeoutAfter,
 	})
 }
