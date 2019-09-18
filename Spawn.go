@@ -2,17 +2,20 @@ package proc
 
 import "time"
 
-// Self xxx
-type Self = func() ProcessID
+// PIDFunction xxx
+type PIDFunction = func() ProcessID
 
-// Receive xxx
-type Receive = func(ProcessID, interface{})
+// MessageFunction xxx
+type MessageFunction = func() interface{}
 
-// ReceiveDispatcher xxxx
-type ReceiveDispatcher = func(Receive, ...time.Duration)
+// ReceiveHandler xxx
+type ReceiveHandler = func(PIDFunction, MessageFunction)
+
+// ReceiveFunction xxxx
+type ReceiveFunction = func(ReceiveHandler, ...time.Duration)
 
 // ProcessHandler xxxxxxxxxx
-type ProcessHandler = func(Self, ReceiveDispatcher, ...interface{})
+type ProcessHandler = func(PIDFunction, ReceiveFunction, ...interface{})
 
 // Spawn xxxx
 func Spawn(handler ProcessHandler, args ...interface{}) ProcessID {

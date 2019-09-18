@@ -2,7 +2,7 @@ package proc
 
 import "time"
 
-func timerProcess(self Self, _ ReceiveDispatcher, args ...interface{}) {
+func timerProcess(self PIDFunction, _ ReceiveFunction, args ...interface{}) {
 
 	if len(args) < 2 {
 		return

@@ -12,7 +12,7 @@ const (
 )
 
 type receiveQueueType struct {
-	handler      Receive
+	handler      ReceiveHandler
 	timeoutAfter time.Duration
 	timerPid     ProcessID
 }
@@ -111,7 +111,7 @@ processMessagesLabel:
 
 		case startProcessMessage:
 
-			proc.handler(func() ProcessID { return proc.pid }, func(receive Receive, after ...time.Duration) {
+			proc.handler(func() ProcessID { return proc.pid }, func(receive ReceiveHandler, after ...time.Duration) {
 				if receive == nil {
 					return
 				}
@@ -219,7 +219,9 @@ func (proc *process) invokeReceive(sender ProcessID, message interface{}) {
 	var handler = proc.receiveQueue[0].handler
 	proc.receiveQueue = proc.receiveQueue[1:]
 
-	handler(sender, message)
+	handler(
+		func() ProcessID { return sender },
+		func() interface{} { return message })
 }
 
 func (proc *process) stopProcess(sender ProcessID, reason interface{}) {
