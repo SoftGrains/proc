@@ -2,7 +2,7 @@ package proc
 
 import "time"
 
-func timerProcess(self ProcessID, receive ReceiveDispatcher, args ...interface{}) {
+func timerProcess(self Self, _ ReceiveDispatcher, args ...interface{}) {
 
 	if len(args) < 2 {
 		return
@@ -23,7 +23,7 @@ func timerProcess(self ProcessID, receive ReceiveDispatcher, args ...interface{}
 	// sleep for a timeout
 	time.Sleep(timeoutAfter)
 
-	sender.SendFrom(self, timeoutMessage{
+	sender.SendFrom(self(), timeoutMessage{
 		After: timeoutAfter,
 	})
 }

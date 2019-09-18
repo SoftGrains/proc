@@ -2,6 +2,9 @@ package proc
 
 import "time"
 
+// Self xxx
+type Self = func() ProcessID
+
 // Receive xxx
 type Receive = func(ProcessID, interface{})
 
@@ -9,7 +12,7 @@ type Receive = func(ProcessID, interface{})
 type ReceiveDispatcher = func(Receive, ...time.Duration)
 
 // ProcessHandler xxxxxxxxxx
-type ProcessHandler = func(ProcessID, ReceiveDispatcher, ...interface{})
+type ProcessHandler = func(Self, ReceiveDispatcher, ...interface{})
 
 // Spawn xxxx
 func Spawn(handler ProcessHandler, args ...interface{}) ProcessID {

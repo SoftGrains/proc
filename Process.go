@@ -111,7 +111,7 @@ processMessagesLabel:
 
 		case startProcessMessage:
 
-			proc.handler(proc.pid, func(receive Receive, after ...time.Duration) {
+			proc.handler(func() ProcessID { return proc.pid }, func(receive Receive, after ...time.Duration) {
 				if receive == nil {
 					return
 				}
