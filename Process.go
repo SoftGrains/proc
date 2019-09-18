@@ -144,14 +144,17 @@ processMessagesLabel:
 
 		case timeoutMessage:
 			// check that message fired for the right current receive handler
-			if len(proc.receiveQueue) > 0 {
+			if len(proc.receiveQueue) == 0 {
+				continue
+
+			} else {
 				var handler = proc.receiveQueue[0]
 				if handler.timerPid != sender {
 					continue
 				}
-
-				msg = TimeoutMessage{m.After}
 			}
+
+			msg = TimeoutMessage{m.After}
 
 		case FollowMessage:
 			if sender != nil && sender != proc.pid {

@@ -35,7 +35,7 @@ type FollowMessage struct{}
 type UnfollowMessage struct{}
 
 // FollowerStoppedMessage xxx
-type FollowerStoppedMessage struct{
+type FollowerStoppedMessage struct {
 	Reason interface{}
 }
 
@@ -48,7 +48,6 @@ func isInternalMessage(message interface{}) bool {
 
 	case startProcessMessage,
 		StopProcessMessage,
-		timeoutMessage,
 		FollowMessage,
 		UnfollowMessage,
 		FollowerStoppedMessage:
