@@ -177,9 +177,14 @@ processMessagesLabel:
 			continue
 		}
 
-		proc.invokeReceive(sender, msg)
+		var panicValue = proc.invokeReceive(sender, msg)
 
-		if len(proc.receiveQueue) == 0 {
+		if panicValue != nil {
+			proc.stopProcess(sender, panicValue)
+
+			return
+
+		} else if len(proc.receiveQueue) == 0 {
 			proc.stopProcess(sender, "normal")
 
 			return
@@ -213,7 +218,7 @@ func (proc *process) pullMessage() (interface{}, bool) {
 	return msg, ok
 }
 
-func (proc *process) invokeReceive(sender ProcessID, message interface{}) {
+func (proc *process) invokeReceive(sender ProcessID, message interface{}) (panicValue interface{}) {
 
 	if len(proc.receiveQueue) == 0 {
 		return
@@ -222,21 +227,26 @@ func (proc *process) invokeReceive(sender ProcessID, message interface{}) {
 	var handler = proc.receiveQueue[0].handler
 	proc.receiveQueue = proc.receiveQueue[1:]
 
+	defer func() {
+		if r := recover(); r != nil {
+			panicValue = r
+		}
+	}()
+
 	handler(
 		func() ProcessID { return sender },
 		func() interface{} { return message })
+
+	return
 }
 
 func (proc *process) stopProcess(sender ProcessID, reason interface{}) {
-	atomic.StoreInt32(&proc.processStatus, terminated)
 
-	proc.invokeReceive(sender, ProcessStoppedMessage{
-		Reason: reason,
-	})
+	atomic.StoreInt32(&proc.processStatus, terminated)
 
 	// notify the follower processes
 	for _, fpid := range proc.followers {
-		fpid.SendFrom(proc.pid, FollowerStoppedMessage{
+		fpid.SendFrom(proc.pid, ProcessStoppedMessage{
 			Reason: reason,
 		})
 	}
