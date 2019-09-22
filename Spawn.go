@@ -15,7 +15,7 @@ type ReceiveHandler = func(PIDFunction, MessageFunction)
 type ReceiveFunction = func(ReceiveHandler, ...time.Duration)
 
 // ProcessHandler xxxxxxxxxx
-type ProcessHandler = func(PIDFunction, ReceiveFunction, ...interface{})
+type ProcessHandler = func(*Context)
 
 // Spawn xxxx
 func Spawn(handler ProcessHandler, args ...interface{}) ProcessID {

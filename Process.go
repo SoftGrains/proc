@@ -111,7 +111,7 @@ processMessagesLabel:
 
 		case startProcessMessage:
 
-			proc.handler(func() ProcessID { return proc.pid }, func(receive ReceiveHandler, after ...time.Duration) {
+			var context = newContext(proc.pid, func(receive ReceiveHandler, after ...time.Duration) {
 				if receive == nil {
 					return
 				}
@@ -127,7 +127,9 @@ processMessagesLabel:
 
 				proc.receiveQueue = append(proc.receiveQueue, handler)
 
-			}, proc.args...)
+			}, proc.args)
+
+			proc.handler(context)
 
 			if len(proc.receiveQueue) == 0 {
 				proc.stopProcess(sender, "normal")
