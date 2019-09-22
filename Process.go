@@ -235,9 +235,10 @@ func (proc *process) invokeReceive(sender ProcessID, message interface{}) (panic
 		}
 	}()
 
-	handler(
-		func() ProcessID { return sender },
-		func() interface{} { return message })
+	handler(newReceiveContext(
+		sender,
+		message,
+	))
 
 	return
 }

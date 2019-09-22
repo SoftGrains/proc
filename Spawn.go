@@ -9,7 +9,7 @@ type PIDFunction = func() ProcessID
 type MessageFunction = func() interface{}
 
 // ReceiveHandler xxx
-type ReceiveHandler = func(PIDFunction, MessageFunction)
+type ReceiveHandler = func(*ReceiveContext)
 
 // ReceiveFunction xxxx
 type ReceiveFunction = func(ReceiveHandler, ...time.Duration)
