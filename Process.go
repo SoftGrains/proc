@@ -140,6 +140,11 @@ processMessagesLabel:
 			continue
 
 		case StopProcessMessage:
+
+			proc.invokeReceive(sender, ProcessStoppedMessage{
+				Reason: m.Reason,
+			})
+
 			proc.stopProcess(sender, m.Reason)
 
 			return
