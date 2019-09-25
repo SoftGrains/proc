@@ -11,7 +11,9 @@ const (
 	terminated
 )
 
-type receiveQueueType struct {
+type receiveNodeType struct {
+	parent       *receiveNodeType
+	childs       []*receiveNodeType
 	handler      ReceiveHandler
 	timeoutAfter time.Duration
 	timerPid     ProcessID
@@ -20,7 +22,7 @@ type receiveQueueType struct {
 // Process xxx
 type process struct {
 	pid             ProcessID
-	receiveQueue    []*receiveQueueType
+	receiveNode     *receiveNodeType
 	handler         ProcessHandler
 	args            []interface{}
 	internalMailbox *Mailbox
@@ -38,6 +40,7 @@ func newProcess(handler ProcessHandler, args []interface{}) *process {
 		internalMailbox: NewMailbox(),
 		mailbox:         NewMailbox(),
 		processStatus:   idle,
+		receiveNode:     &receiveNodeType{},
 	}
 }
 
@@ -82,10 +85,10 @@ processMessagesLabel:
 
 	for {
 
-		// check for next receive timeout
-		if len(proc.receiveQueue) > 0 {
-			var nextHandler = proc.receiveQueue[0]
+		var nextHandler = getNextHandler(proc.receiveNode)
 
+		// check for next receive timeout
+		if nextHandler != nil {
 			// start timer process
 			if nextHandler.timeoutAfter >= 0 &&
 				nextHandler.timerPid == nil {
@@ -116,32 +119,27 @@ processMessagesLabel:
 					return
 				}
 
-				var handler = &receiveQueueType{
+				var node = &receiveNodeType{
+					parent:       proc.receiveNode,
 					handler:      receive,
 					timeoutAfter: -1,
 				}
 
 				if len(after) > 0 {
-					handler.timeoutAfter = after[0]
+					node.timeoutAfter = after[0]
 				}
 
-				proc.receiveQueue = append(proc.receiveQueue, handler)
+				proc.receiveNode.childs = append(proc.receiveNode.childs, node)
 
 			}, proc.args)
 
 			proc.handler(context)
 
-			if len(proc.receiveQueue) == 0 {
-				proc.stopProcess(sender, "normal")
-
-				return
-			}
-
 			continue
 
 		case StopProcessMessage:
 
-			proc.invokeReceive(sender, ProcessStoppedMessage{
+			proc.invokeReceive(nextHandler, sender, ProcessStoppedMessage{
 				Reason: m.Reason,
 			})
 
@@ -151,12 +149,11 @@ processMessagesLabel:
 
 		case timeoutMessage:
 			// check that message fired for the right current receive handler
-			if len(proc.receiveQueue) == 0 {
+			if nextHandler == nil {
 				continue
 
 			} else {
-				var handler = proc.receiveQueue[0]
-				if handler.timerPid != sender {
+				if nextHandler.timerPid != sender {
 					continue
 				}
 			}
@@ -184,15 +181,15 @@ processMessagesLabel:
 			continue
 		}
 
-		var panicValue = proc.invokeReceive(sender, msg)
-
-		if panicValue != nil {
-			proc.stopProcess(sender, panicValue)
+		if nextHandler == nil {
+			proc.stopProcess(sender, "normal")
 
 			return
+		}
 
-		} else if len(proc.receiveQueue) == 0 {
-			proc.stopProcess(sender, "normal")
+		var panicValue = proc.invokeReceive(nextHandler, sender, msg)
+		if panicValue != nil {
+			proc.stopProcess(sender, panicValue)
 
 			return
 		}
@@ -225,16 +222,15 @@ func (proc *process) pullMessage() (interface{}, bool) {
 	return msg, ok
 }
 
-func (proc *process) invokeReceive(sender ProcessID, message interface{}) (panicValue interface{}) {
+func (proc *process) invokeReceive(node *receiveNodeType, sender ProcessID, message interface{}) (panicValue interface{}) {
 
-	if len(proc.receiveQueue) == 0 {
-		return
-	}
+	proc.receiveNode = node
 
-	var handler = proc.receiveQueue[0].handler
-	proc.receiveQueue = proc.receiveQueue[1:]
+	var handler = node.handler
 
 	defer func() {
+		proc.receiveNode = getNextNode(node)
+
 		if r := recover(); r != nil {
 			panicValue = r
 		}
@@ -269,4 +265,31 @@ func (proc *process) getFollowerIndex(follower ProcessID) int {
 	}
 
 	return -1
+}
+
+func getNextNode(node *receiveNodeType) *receiveNodeType {
+
+	if len(node.childs) == 0 {
+
+		if node.parent != nil {
+			node.parent.childs = node.parent.childs[1:]
+
+			return getNextNode(node.parent)
+		}
+	}
+
+	return node
+}
+
+func getNextHandler(curNode *receiveNodeType) *receiveNodeType {
+
+	if len(curNode.childs) > 0 {
+		return curNode.childs[0]
+	}
+
+	if curNode.parent == nil {
+		return nil
+	}
+
+	return getNextHandler(curNode.parent)
 }
